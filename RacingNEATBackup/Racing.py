@@ -14,9 +14,96 @@ clock = pygame.time.Clock()
 from pygame.locals import *
 import pickle
 
+import random
+
+def draw_net(config, genome, view=False, filename=None, node_names=None, show_disabled=True, prune_unused=False,
+             node_colors=None, fmt='svg'):
+    """ Receives a genome and draws a neural network with arbitrary topology. """
+    # Attributes for network nodes.
+    if graphviz is None:
+        warnings.warn("This display is not available due to a missing optional dependency (graphviz)")
+        return
+
+    if node_names is None:
+        node_names = {}
+
+    assert type(node_names) is dict
+
+    if node_colors is None:
+        node_colors = {}
+
+    assert type(node_colors) is dict
+
+    node_attrs = {
+        'shape': 'circle',
+        'fontsize': '9',
+        'height': '0.2',
+        'width': '0.2'}
+
+    dot = graphviz.Digraph(format=fmt, node_attr=node_attrs)
+
+    inputs = set()
+    for k in config.genome_config.input_keys:
+        inputs.add(k)
+        name = node_names.get(k, str(k))
+        input_attrs = {'style': 'filled', 'shape': 'box', 'fillcolor': node_colors.get(k, 'lightgray')}
+        dot.node(name, _attributes=input_attrs)
+
+    outputs = set()
+    for k in config.genome_config.output_keys:
+        outputs.add(k)
+        name = node_names.get(k, str(k))
+        node_attrs = {'style': 'filled', 'fillcolor': node_colors.get(k, 'lightblue')}
+
+        dot.node(name, _attributes=node_attrs)
+
+    if prune_unused:
+        connections = set()
+        for cg in genome.connections.values():
+            if cg.enabled or show_disabled:
+                connections.add(cg.key)
+
+        used_nodes = copy.copy(outputs)
+        pending = copy.copy(outputs)
+        while pending:
+            new_pending = set()
+            for a, b in connections:
+                if b in pending and a not in used_nodes:
+                    new_pending.add(a)
+                    used_nodes.add(a)
+            pending = new_pending
+    else:
+        used_nodes = set(genome.nodes.keys())
+
+    for n in used_nodes:
+        if n in inputs or n in outputs:
+            continue
+
+        attrs = {'style': 'filled', 'fillcolor': node_colors.get(n, 'white')}
+        dot.node(str(n), _attributes=attrs)
+
+    for cg in genome.connections.values():
+        if cg.enabled or show_disabled:
+            #if cg.input not in used_nodes or cg.output not in used_nodes:
+            #    continue
+            input, output = cg.key
+            a = node_names.get(input, str(input))
+            b = node_names.get(output, str(output))
+            style = 'solid' if cg.enabled else 'dotted'
+            color = 'green' if cg.weight > 0 else 'red'
+            width = str(0.1 + abs(cg.weight / 5.0))
+            dot.edge(a, b, _attributes={'style': style, 'color': color, 'penwidth': width})
+
+    dot.render(filename, view=view)
+
+    return dot
+
+
+
+
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, picture,x=855,y=135):
+    def __init__(self, picture,x=885,y=135):
         super(Player, self).__init__()
         self.tSpeed = 1.8
         self.heading   = 0
@@ -42,6 +129,10 @@ class Player(pygame.sprite.Sprite):
 
         if  probs[0]>0.25:
             self.accelerate(0.5)
+#         elif (self.speed>=0.2*30/144):
+#             self.speed-=0.2*30/144
+#         elif (self.speed<0.1):
+#             self.speed =0;
         elif  probs[0]<-0.25:
             self.brake()
         turning = False
@@ -62,9 +153,9 @@ class Player(pygame.sprite.Sprite):
         self.position += self.velocity
         self.rect.center = ( round(self.position[0]), round(self.position[1] ) )
 
-    def turn(self, angle_degrees):
+    def turn(self, angle_degress):
         if(self.speed>0):
-            self.heading += math.radians(angle_degrees)
+            self.heading += math.radians(angle_degress)
             image_index = int( self.heading / self.min_angle ) % len( self.rot_img )
             if ( self.image != self.rot_img[ image_index ] ):
                 x,y = self.rect.center
@@ -227,7 +318,7 @@ def main(genomes, config):
         ge.append(g)
     running=True
     while running:
-        if(len(pList)==0):
+        if(len(pList)==0 or time.time()-t>=30):
             # for g in ge:
             #     g.fitness-=5
             running = False
@@ -248,8 +339,7 @@ def main(genomes, config):
         #players.update(pressed_keys)
 
         for x, p in enumerate(pList):
-            #output = nets[x].activate((p.dLeft(), p.dForward(), p.dRight(), p.speed, p.heading, p.tSpeed))
-            output = nets[x].activate((p.dLeft(), p.dForward(), p.dRight(), p.speed, p.heading, p.tSpeed, p.heading, p.velocity.x, p.velocity.y, p.position.x, p.position.y))
+            output = nets[x].activate((p.dLeft(), p.dForward(), p.dRight(), p.speed, p.heading, p.tSpeed, p.velocity.x, p.velocity.y, p.position.x, p.position.y))
             p.update(output)
         screen.fill((255,255,255))
         screen.blit(dist.image, dist.rect)
@@ -270,8 +360,8 @@ def main(genomes, config):
                 max = ge[x]
             xRight, yRight = pList[x].rect.topright
             xLeft, yLeft = pList[x].rect.topleft
-#             BxRight, ByRight = p.rect.bottomright
-#             BxLeft, ByLeft = p.rect.bottomleft
+            # BxRight, ByRight = p.rect.bottomright
+            # BxLeft, ByLeft = p.rect.bottomleft
             if (x<len(pList) and screen.get_at((int(xRight), int(yRight)))[:3]==(0,0,0)):
                 ge[x].fitness-=1
                 players.remove(pList[x])
@@ -287,11 +377,11 @@ def main(genomes, config):
                 ge.pop(x)
                 pList.pop(x)
                 continue
-            if (x<len(pList) and screen.get_at((int(xRight), int(yRight)))[:3]==(252,252,252) and pList[x].check==1):
+            if (x<len(pList) and (screen.get_at((int(xRight), int(yRight)))[:3]==(252,252,252)) and pList[x].check==1):
                 pList[x].check = 2
                 #p.score+=1
                 ge[x].fitness+=5
-            if (x<len(pList) and screen.get_at((int(xRight), int(yRight)))[:3]==(255,255,255) and (pList[x].check == 2 or pList[x].check ==0)):
+            if (x<len(pList) and (screen.get_at((int(xRight), int(yRight)))[:3]==(255,255,255)) and (pList[x].check == 2 or pList[x].check ==0)):
                 pList[x].check = 1
                 #p.score+=1
                 ge[x].fitness+=5
@@ -324,7 +414,10 @@ def main(genomes, config):
             x+=1
 
         pygame.display.flip()
-        tick = clock.tick(60)
+        tick = clock.tick(30)
+    if (maxFit<max.fitness):
+        draw_net(config, max, node_names={0:"Accelerate/Brake", 1:"Right/Left", 2:"Left", 3:"Right", -1: "dLeft", -2:"dForward", -3:"dRight", -4:"Speed", -5:"Heading"})
+        maxFit = max.fitness
 #main()
 
 
@@ -333,16 +426,16 @@ def run(config_path):
                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
                                config_path)
     p = neat.Population(config)
-    #p = neat.Checkpointer.restore_checkpoint("neat-checkpoint-4099")
+    #p = neat.Checkpointer.restore_checkpoint("neat-checkpoint-5899BackUp")
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
-    #checkpoint = neat.Checkpointer(generation_interval=100, time_interval_seconds=None)
+    checkpoint = neat.Checkpointer(generation_interval=100, time_interval_seconds=None)
     p.add_reporter(stats)
-    #p.add_reporter(checkpoint)
-    file = open("winner97.pkl",'rb')
-    w = pickle.load(file)
+    p.add_reporter(checkpoint)
+    winner = p.run(main,5000) #50 = number of generations
+    file = open(f"winner{random.randint(1, 100)}.pkl", 'wb')
+    pickle.dump(winner, file)
     file.close()
-    main([(0, w)], config) #50 = number of generations
 if __name__ == '__main__':
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, "config.txt")

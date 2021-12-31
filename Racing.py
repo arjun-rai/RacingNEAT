@@ -13,6 +13,7 @@ import graphviz
 clock = pygame.time.Clock()
 from pygame.locals import *
 import pickle
+import random
 
 import random
 
@@ -103,7 +104,7 @@ def draw_net(config, genome, view=False, filename=None, node_names=None, show_di
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, picture,x=885,y=135):
+    def __init__(self, picture,x=855,y=135):
         super(Player, self).__init__()
         self.tSpeed = 1.8
         self.heading   = 0
@@ -311,7 +312,7 @@ def main(genomes, config):
     for _, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
-        player = Player(picture)
+        player = Player(picture,x=random.randint(865, 895),y=random.randint(105, 195))
         players.add(player)
         pList.append(player)
         g.fitness =0
@@ -339,7 +340,7 @@ def main(genomes, config):
         #players.update(pressed_keys)
 
         for x, p in enumerate(pList):
-            output = nets[x].activate((p.dLeft(), p.dForward(), p.dRight(), p.speed, p.heading, p.tSpeed))
+            output = nets[x].activate((p.dLeft(), p.dForward(), p.dRight(), p.speed, p.heading, p.tSpeed, p.heading, p.velocity.x, p.velocity.y, p.position.x, p.position.y))
             p.update(output)
         screen.fill((255,255,255))
         screen.blit(dist.image, dist.rect)
@@ -377,7 +378,7 @@ def main(genomes, config):
                 ge.pop(x)
                 pList.pop(x)
                 continue
-            if (x<len(pList) and (screen.get_at((int(xRight), int(yRight)))[:3]==(252,252,252)) and pList[x].check==1):
+            if (x<len(pList) and (screen.get_at((int(xRight), int(yRight)))[:3]==(252,252,252)) and (pList[x].check==1)):
                 pList[x].check = 2
                 #p.score+=1
                 ge[x].fitness+=5
@@ -392,9 +393,9 @@ def main(genomes, config):
                 pList[x].point = True
 
             if (x<len(pList) and math.degrees(pList[x].heading)%360>-45 and math.degrees(pList[x].heading)%360<45 and pList[x].position.y>500):
-                ge[x].fitness-=1
+                ge[x].fitness-=10
             elif(x<len(pList) and abs(math.degrees(pList[x].heading))%360 > 135 and abs(math.degrees(pList[x].heading))%360 < 225 and pList[x].position.y<500):
-                ge[x].fitness-=1
+                ge[x].fitness-=10
 
 
             # if (x<len(pList) and screen.get_at((int(xRight), int(yRight)))[:3]==(255,0,0)  and pList[x].point==True and math.degrees(pList[x].heading)%360>-45 and math.degrees(pList[x].heading)%360<45):
@@ -426,7 +427,7 @@ def run(config_path):
                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
                                config_path)
     p = neat.Population(config)
-    #p = neat.Checkpointer.restore_checkpoint("neat-checkpoint-5899BackUp")
+    p = neat.Checkpointer.restore_checkpoint("neat-checkpoint-399")
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     checkpoint = neat.Checkpointer(generation_interval=100, time_interval_seconds=None)

@@ -16,7 +16,7 @@ import pickle
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, picture,x=855,y=135):
+    def __init__(self, picture,x=885,y=135):
         super(Player, self).__init__()
         self.tSpeed = 1.8
         self.heading   = 0
@@ -62,9 +62,9 @@ class Player(pygame.sprite.Sprite):
         self.position += self.velocity
         self.rect.center = ( round(self.position[0]), round(self.position[1] ) )
 
-    def turn(self, angle_degrees):
+    def turn(self, angle_degress):
         if(self.speed>0):
-            self.heading += math.radians(angle_degrees)
+            self.heading += math.radians(angle_degress)
             image_index = int( self.heading / self.min_angle ) % len( self.rot_img )
             if ( self.image != self.rot_img[ image_index ] ):
                 x,y = self.rect.center
@@ -248,8 +248,7 @@ def main(genomes, config):
         #players.update(pressed_keys)
 
         for x, p in enumerate(pList):
-            #output = nets[x].activate((p.dLeft(), p.dForward(), p.dRight(), p.speed, p.heading, p.tSpeed))
-            output = nets[x].activate((p.dLeft(), p.dForward(), p.dRight(), p.speed, p.heading, p.tSpeed, p.heading, p.velocity.x, p.velocity.y, p.position.x, p.position.y))
+            output = nets[x].activate((p.dLeft(), p.dForward(), p.dRight(), p.speed, p.heading, p.tSpeed, p.velocity.x, p.velocity.y, p.position.x, p.position.y))
             p.update(output)
         screen.fill((255,255,255))
         screen.blit(dist.image, dist.rect)
@@ -339,7 +338,7 @@ def run(config_path):
     #checkpoint = neat.Checkpointer(generation_interval=100, time_interval_seconds=None)
     p.add_reporter(stats)
     #p.add_reporter(checkpoint)
-    file = open("winner97.pkl",'rb')
+    file = open("winner36.pkl",'rb')
     w = pickle.load(file)
     file.close()
     main([(0, w)], config) #50 = number of generations
